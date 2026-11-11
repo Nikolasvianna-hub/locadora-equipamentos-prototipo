@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Equipamento — Nome da Empresa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main id="conteudo">
+  <div class="wrap" id="produto"></div>
+  <section style="padding-top:20px"><div class="wrap">
+    <div class="titulo-sec"><div><h2>Equipamentos similares</h2></div><a class="btn btn-linha" href="catalogo.html">Ver catálogo</a></div>
+    <div class="grade" id="similares"></div>
+  </div></section>
+</main>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  montarLayout("Equipamentos");
+  const id = new URLSearchParams(location.search).get("id");
+  const p = PRODUTOS.find(x => x.id === id) || PRODUTOS[0];
+  document.title = `${p.nome} — ${EMPRESA.nome}`;
+  $("#produto").innerHTML = `
+    <p class="migalha" style="margin-top:28px;color:var(--texto-suave)"><a href="index.html">Início</a> / <a href="catalogo.html">Equipamentos</a> / <a href="catalogo.html?cat=${p.cat}">${catNome(p.cat)}</a> / ${p.nome}</p>
+    <div class="prod-grid">
+      <div class="prod-arte cat-${p.cat}">${p.selo ? `<span class="selo ${p.selo === "Promoção" ? "selo-promo" : p.selo === "Lançamento" ? "selo-lanc" : ""}">${p.selo}</span>` : ""}${ilustracao(iconeProduto(p))}</div>
+      <div class="prod-info">
+        <span class="card-cat">${p.marca} · ${catNome(p.cat)}</span>
+        <h1>${p.nome}</h1>
+        <p class="preco">${p.precoDe ? `<s>${brl(p.precoDe)}</s>` : ""}<strong>${brl(p.preco)}</strong><span>/ diária</span></p>
+        <p style="color:var(--texto-suave);margin-top:14px">${p.desc}</p>
+        <div class="acoes">
+          <button class="btn btn-primario" data-add="${p.id}">Adicionar ao orçamento</button>
+          <a class="btn btn-wa" target="_blank" rel="noopener" href="${waLink(`Olá! Quero consultar a disponibilidade de: ${p.nome}.`)}">Consultar no WhatsApp</a>
+        </div>
+        <div class="inclusos"><h3>Acompanha gratuitamente</h3><ul>${p.inclusos.map(i => `<li>${i}</li>`).join("")}</ul></div>
+        <table class="tabela-specs"><caption class="pular">Características</caption>
+          ${Object.entries(p.specs).map(([k, v]) => `<tr><th scope="row">${k}</th><td>${v}</td></tr>`).join("")}</table>
+      </div>
+    </div>`;
+  const sim = PRODUTOS.filter(x => x.cat === p.cat && x.id !== p.id);
+  const extra = PRODUTOS.filter(x => x.cat !== p.cat && x.id !== p.id);
+  $("#similares").innerHTML = [...sim, ...extra].slice(0, 4).map(card).join("");
+  ligarBotoes();
+</script>
+</body>
+</html>

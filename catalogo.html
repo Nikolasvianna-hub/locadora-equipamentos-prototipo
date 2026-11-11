@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Equipamentos — Nome da Empresa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main id="conteudo">
+  <div class="pagina-topo"><div class="wrap">
+    <p class="migalha"><a href="index.html">Início</a> / <span id="migalha-cat">Equipamentos</span></p>
+    <h1 id="titulo">Catálogo de equipamentos</h1>
+    <p>Busque por nome, categoria, marca ou faixa de preço e monte seu orçamento.</p>
+  </div></div>
+  <div class="wrap">
+    <form class="filtros" id="filtros" onsubmit="return false">
+      <div class="busca"><label for="f-busca">Buscar</label><input id="f-busca" type="search" placeholder="Ex.: câmera 6K, lapela, LED…"></div>
+      <div><label for="f-cat">Categoria</label><select id="f-cat"><option value="">Todas</option></select></div>
+      <div><label for="f-marca">Marca</label><select id="f-marca"><option value="">Todas</option></select></div>
+      <div><label for="f-ordem">Ordenar por</label><select id="f-ordem">
+        <option value="rel">Relevância</option><option value="menor">Menor preço</option><option value="maior">Maior preço</option><option value="nome">Nome A–Z</option></select></div>
+    </form>
+    <p class="resultado" id="resultado" aria-live="polite"></p>
+    <div class="grade" id="grade"></div>
+  </div>
+</main>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  montarLayout("Equipamentos");
+  const qs = new URLSearchParams(location.search);
+  $("#f-cat").insertAdjacentHTML("beforeend", CATEGORIAS.map(c => `<option value="${c.id}">${c.nome}</option>`).join(""));
+  $("#f-marca").insertAdjacentHTML("beforeend", [...new Set(PRODUTOS.map(p => p.marca))].sort().map(m => `<option>${m}</option>`).join(""));
+  if (qs.get("cat")) $("#f-cat").value = qs.get("cat");
+  if (qs.get("q")) $("#f-busca").value = qs.get("q");
+  const norm = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  function filtrar() {
+    const q = norm($("#f-busca").value.trim()), cat = $("#f-cat").value, marca = $("#f-marca").value, ordem = $("#f-ordem").value;
+    let lista = PRODUTOS.filter(p => (!cat || p.cat === cat) && (!marca || p.marca === marca) &&
+      (!q || norm(`${p.nome} ${p.marca} ${catNome(p.cat)} ${Object.values(p.specs).join(" ")}`).includes(q)));
+    if (ordem === "menor") lista.sort((a, b) => a.preco - b.preco);
+    if (ordem === "maior") lista.sort((a, b) => b.preco - a.preco);
+    if (ordem === "nome") lista.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    $("#titulo").textContent = cat ? catNome(cat) : "Catálogo de equipamentos";
+    $("#migalha-cat").textContent = cat ? catNome(cat) : "Equipamentos";
+    document.title = `${cat ? catNome(cat) : "Equipamentos"} — ${EMPRESA.nome}`;
+    $("#resultado").textContent = `${lista.length} equipamento${lista.length === 1 ? "" : "s"} encontrado${lista.length === 1 ? "" : "s"}`;
+    $("#grade").innerHTML = lista.length ? lista.map(card).join("") : `<p class="vazio" style="grid-column:1/-1">Nada encontrado. Tente outro termo ou fale com a gente no WhatsApp.</p>`;
+    ligarBotoes($("#grade"));
+  }
+  ["#f-busca", "#f-cat", "#f-marca", "#f-ordem"].forEach(s => $(s).addEventListener("input", filtrar));
+  filtrar();
+</script>
+</body>
+</html>

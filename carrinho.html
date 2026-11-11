@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Orçamento — Nome da Empresa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<main id="conteudo">
+  <div class="pagina-topo"><div class="wrap">
+    <p class="migalha"><a href="index.html">Início</a> / Orçamento</p>
+    <h1>Seu orçamento</h1>
+    <p>Revise os itens, escolha as datas e envie o pedido. A equipe confirma disponibilidade e valores pelo WhatsApp.</p>
+  </div></div>
+  <div class="wrap carr-grid">
+    <div id="itens"></div>
+    <aside class="resumo" aria-labelledby="resumo-t">
+      <h2 id="resumo-t">Resumo</h2>
+      <div class="datas">
+        <div><label for="retirada">Retirada</label><input type="date" id="retirada"></div>
+        <div><label for="devolucao">Devolução</label><input type="date" id="devolucao"></div>
+      </div>
+      <label for="cupom">Cupom</label><input id="cupom" placeholder="Ex.: BEMVINDO10" autocomplete="off">
+      <div class="linha-total"><span>Diárias</span><span id="t-dias">1</span></div>
+      <div class="linha-total"><span>Subtotal</span><span id="t-sub">R$ 0</span></div>
+      <div class="linha-total" id="linha-desc" hidden><span>Desconto</span><span id="t-desc">– R$ 0</span></div>
+      <div class="linha-total grande"><span>Estimativa</span><span id="t-total">R$ 0</span></div>
+      <button class="btn btn-wa" id="enviar">Enviar pedido pelo WhatsApp</button>
+      <p class="nota">Valores estimados. Fins de semana, entregas e cadastro são confirmados pela equipe. Protótipo — dados fictícios.</p>
+    </aside>
+  </div>
+</main>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script>
+  montarLayout("");
+  const hoje = new Date(); const iso = d => d.toISOString().slice(0, 10);
+  const amanha = new Date(hoje.getTime() + 864e5);
+  $("#retirada").value = iso(hoje); $("#devolucao").value = iso(amanha); $("#retirada").min = iso(hoje);
+  function dias() {
+    const a = new Date($("#retirada").value), b = new Date($("#devolucao").value);
+    return Math.max(1, Math.round((b - a) / 864e5) || 1);
+  }
+  function render() {
+    const itens = Carrinho.ler();
+    if (!itens.length) {
+      $("#itens").innerHTML = `<div class="vazio" style="background:#fff;border:1px solid var(--linha);border-radius:20px">
+        <h2 style="margin-bottom:8px">Seu orçamento está vazio</h2><p>Adicione equipamentos ou kits para montar o pedido.</p>
+        <p style="margin-top:18px"><a class="btn btn-primario" href="catalogo.html">Ver equipamentos</a></p></div>`;
+    } else {
+      $("#itens").innerHTML = itens.map(i => {
+        const x = itemInfo(i); if (!x) return "";
+        const icone = i.tipo === "kit" ? "kit" : iconeProduto(x), cat = i.tipo === "kit" ? "" : `cat-${x.cat}`;
+        return `<div class="item"><div class="item-img ${cat || "cat-acessorios"}">${ilustracao(icone)}</div>
+          <div><h3>${x.nome}</h3><small>${brl(x.preco)} / diária${i.tipo === "kit" ? " · kit" : ""}</small><br>
+            <button class="remover" data-rem="${i.id}">Remover</button></div>
+          <div class="qtd" aria-label="Quantidade"><button data-menos="${i.id}" aria-label="Diminuir">−</button><span>${i.qtd}</span><button data-mais="${i.id}" aria-label="Aumentar">+</button></div></div>`;
+      }).join("");
+    }
+    $$("[data-rem]").forEach(b => b.onclick = () => { Carrinho.remover(b.dataset.rem); render(); });
+    $$("[data-mais]").forEach(b => b.onclick = () => { const it = Carrinho.ler().find(i => i.id === b.dataset.mais); Carrinho.qtd(it.id, it.qtd + 1); render(); });
+    $$("[data-menos]").forEach(b => b.onclick = () => { const it = Carrinho.ler().find(i => i.id === b.dataset.menos); Carrinho.qtd(it.id, it.qtd - 1); render(); });
+    totais();
+  }
+  function totais() {
+    const d = dias(), sub = Carrinho.ler().reduce((s, i) => { const x = itemInfo(i); return s + (x ? x.preco * i.qtd * d : 0); }, 0);
+    const okCupom = $("#cupom").value.trim().toUpperCase() === EMPRESA.cupom, desc = okCupom ? sub * EMPRESA.desconto : 0;
+    $("#t-dias").textContent = d; $("#t-sub").textContent = brl(sub); $("#linha-desc").hidden = !okCupom;
+    $("#t-desc").textContent = "– " + brl(desc); $("#t-total").textContent = brl(sub - desc);
+    return { d, sub, desc, okCupom };
+  }
+  ["#retirada", "#devolucao", "#cupom"].forEach(s => $(s).addEventListener("input", totais));
+  $("#enviar").onclick = () => {
+    const itens = Carrinho.ler(); if (!itens.length) { avisar("Adicione itens ao orçamento"); return; }
+    const t = totais(), fmt = s => s.split("-").reverse().join("/");
+    const linhas = itens.map(i => { const x = itemInfo(i); return `• ${i.qtd}x ${x.nome} (${brl(x.preco)}/diária)`; });
+    const msg = `Olá! Vim pelo site e gostaria de um orçamento:\n\n${linhas.join("\n")}\n\nRetirada: ${fmt($("#retirada").value)}\nDevolução: ${fmt($("#devolucao").value)} (${t.d} diária${t.d > 1 ? "s" : ""})\n` +
+      (t.okCupom ? `Cupom: ${EMPRESA.cupom}\n` : "") + `Estimativa: ${brl(t.sub - t.desc)}`;
+    window.open(waLink(msg), "_blank", "noopener");
+  };
+  render();
+</script>
+</body>
+</html>
