@@ -23,6 +23,10 @@
         <div><label for="retirada">Retirada</label><input type="date" id="retirada"></div>
         <div><label for="devolucao">Devolução</label><input type="date" id="devolucao"></div>
       </div>
+      <label for="c-nome">Seu nome *</label><input id="c-nome" autocomplete="name" required>
+      <label for="c-tel">WhatsApp / telefone *</label><input id="c-tel" type="tel" autocomplete="tel" placeholder="(00) 00000-0000" required>
+      <label for="c-prod">Produção / empresa (opcional)</label><input id="c-prod" autocomplete="organization">
+      <label for="c-obs">Observações (opcional)</label><input id="c-obs" placeholder="Ex.: preciso de entrega no set">
       <label for="cupom">Cupom</label><input id="cupom" placeholder="Ex.: BEMVINDO10" autocomplete="off">
       <div class="linha-total"><span>Diárias</span><span id="t-dias">1</span></div>
       <div class="linha-total"><span>Subtotal</span><span id="t-sub">R$ 0</span></div>
@@ -35,9 +39,10 @@
 </main>
 <script src="assets/js/data.js"></script>
 <script src="assets/js/app.js"></script>
+<script src="assets/js/reservas.js"></script>
 <script>
   montarLayout("");
-  const hoje = new Date(); const iso = d => d.toISOString().slice(0, 10);
+  const hoje = new Date(); const iso = d => { const x = new Date(d); x.setMinutes(x.getMinutes() - x.getTimezoneOffset()); return x.toISOString().slice(0, 10); };
   const amanha = new Date(hoje.getTime() + 864e5);
   $("#retirada").value = iso(hoje); $("#devolucao").value = iso(amanha); $("#retirada").min = iso(hoje);
   function dias() {
@@ -75,11 +80,22 @@
   ["#retirada", "#devolucao", "#cupom"].forEach(s => $(s).addEventListener("input", totais));
   $("#enviar").onclick = () => {
     const itens = Carrinho.ler(); if (!itens.length) { avisar("Adicione itens ao orçamento"); return; }
+    const nome = $("#c-nome").value.trim(), tel = $("#c-tel").value.trim();
+    if (!nome || tel.replace(/\D/g, "").length < 10) { avisar("Preencha nome e telefone com DDD"); (!nome ? $("#c-nome") : $("#c-tel")).focus(); return; }
+    if ($("#devolucao").value < $("#retirada").value) { avisar("A devolução precisa ser depois da retirada"); $("#devolucao").focus(); return; }
     const t = totais(), fmt = s => s.split("-").reverse().join("/");
+    // registra a reserva (protótipo: no navegador; versão real: no banco de dados)
+    const r = Reservas.criar({ cliente: { nome, telefone: tel, producao: $("#c-prod").value.trim() }, obs: $("#c-obs").value.trim(),
+      retirada: $("#retirada").value, devolucao: $("#devolucao").value, itens, cupom: t.okCupom ? EMPRESA.cupom : "", total: t.sub - t.desc });
     const linhas = itens.map(i => { const x = itemInfo(i); return `• ${i.qtd}x ${x.nome} (${brl(x.preco)}/diária)`; });
-    const msg = `Olá! Vim pelo site e gostaria de um orçamento:\n\n${linhas.join("\n")}\n\nRetirada: ${fmt($("#retirada").value)}\nDevolução: ${fmt($("#devolucao").value)} (${t.d} diária${t.d > 1 ? "s" : ""})\n` +
-      (t.okCupom ? `Cupom: ${EMPRESA.cupom}\n` : "") + `Estimativa: ${brl(t.sub - t.desc)}`;
+    const msg = `Olá! Sou ${nome} e fiz o pedido ${r.codigo} pelo site:\n\n${linhas.join("\n")}\n\nRetirada: ${fmt(r.retirada)}\nDevolução: ${fmt(r.devolucao)} (${t.d} diária${t.d > 1 ? "s" : ""})\n` +
+      (t.okCupom ? `Cupom: ${EMPRESA.cupom}\n` : "") + `Estimativa: ${brl(r.total)}` + (r.obs ? `\nObs.: ${r.obs}` : "");
     window.open(waLink(msg), "_blank", "noopener");
+    Carrinho.salvar([]);
+    $("#itens").innerHTML = `<div class="vazio" style="background:#fff;border:1px solid var(--linha);border-radius:20px">
+      <h2 style="margin-bottom:8px">Pedido ${r.codigo} registrado!</h2><p>Abrimos o WhatsApp com o resumo. A equipe vai confirmar disponibilidade e valores.</p>
+      <p style="margin-top:18px"><a class="btn btn-primario" href="catalogo.html">Continuar navegando</a></p></div>`;
+    totais();
   };
   render();
 </script>

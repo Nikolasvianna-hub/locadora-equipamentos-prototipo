@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Área do Funcionário — Nome da Empresa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body class="adm">
+<header class="adm-topo">
+  <div class="wrap adm-topo-linha">
+    <a class="marca" href="admin.html"><span class="marca-sel">◉</span> <span id="nome-emp">Nome da Empresa</span> <small class="adm-tag">Área do funcionário</small></a>
+    <div class="adm-acoes">
+      <button class="btn btn-linha btn-p" id="exportar">Exportar CSV</button>
+      <a class="btn btn-primario btn-p" href="index.html" target="_blank" rel="noopener">Ver site</a>
+    </div>
+  </div>
+</header>
+
+<main id="conteudo" class="wrap adm-main">
+  <div class="adm-aviso" role="note">
+    <strong>Modo demonstração:</strong> as reservas ficam salvas só neste navegador e há pedidos fictícios de exemplo.
+    Na versão real, esta área terá login de funcionário e um banco de dados compartilhado.
+    <button class="link-btn" id="restaurar">Restaurar exemplos</button>
+  </div>
+
+  <section class="adm-kpis" aria-label="Resumo">
+    <div class="kpi"><small>Retiradas hoje</small><b id="k-ret">0</b></div>
+    <div class="kpi"><small>Devoluções hoje</small><b id="k-dev">0</b></div>
+    <div class="kpi"><small>Pendentes de confirmação</small><b id="k-pen">0</b></div>
+    <div class="kpi"><small>Equipamentos fora agora</small><b id="k-fora">0</b></div>
+    <div class="kpi"><small>Receita estimada do mês</small><b id="k-rec">R$ 0</b></div>
+  </section>
+
+  <div class="abas adm-abas" role="tablist">
+    <button class="aba" role="tab" aria-selected="true" data-aba="lista">Reservas</button>
+    <button class="aba" role="tab" aria-selected="false" data-aba="cal">Calendário</button>
+    <button class="aba" role="tab" aria-selected="false" data-aba="equip">Equipamentos</button>
+  </div>
+
+  <!-- LISTA -->
+  <section class="adm-painel" id="aba-lista">
+    <form class="adm-filtros" onsubmit="return false">
+      <div><label for="f-q">Buscar</label><input id="f-q" type="search" placeholder="Cliente, telefone, código ou equipamento"></div>
+      <div><label for="f-st">Status</label><select id="f-st"><option value="">Todos</option></select></div>
+      <div><label for="f-de">De</label><input id="f-de" type="date"></div>
+      <div><label for="f-ate">Até</label><input id="f-ate" type="date"></div>
+      <div class="f-limpar"><button class="btn btn-linha btn-p" type="button" id="limpar">Limpar</button></div>
+    </form>
+    <p class="resultado" id="res-lista" aria-live="polite"></p>
+    <div class="tabela-wrap">
+      <table class="adm-tabela">
+        <thead><tr><th>Código</th><th>Cliente</th><th>Retirada</th><th>Devolução</th><th>Itens</th><th>Total</th><th>Status</th><th></th></tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- CALENDARIO -->
+  <section class="adm-painel" id="aba-cal" hidden>
+    <div class="cal-nav">
+      <button class="btn btn-linha btn-p" id="cal-ant" aria-label="Mês anterior">‹</button>
+      <h2 id="cal-titulo"></h2>
+      <button class="btn btn-linha btn-p" id="cal-prox" aria-label="Próximo mês">›</button>
+      <span class="cal-leg"><i class="dot ret"></i> retirada <i class="dot dev"></i> devolução <i class="dot uso"></i> em uso</span>
+    </div>
+    <div class="cal-grade" id="cal"></div>
+  </section>
+
+  <!-- EQUIPAMENTOS -->
+  <section class="adm-painel" id="aba-equip" hidden>
+    <p class="resultado">Considera 1 unidade de cada equipamento no acervo. Conflito = mesmo item reservado em datas sobrepostas.</p>
+    <div class="tabela-wrap">
+      <table class="adm-tabela">
+        <thead><tr><th>Equipamento</th><th>Categoria</th><th>Situação agora</th><th>Próximas reservas</th><th>Alerta</th></tr></thead>
+        <tbody id="tb-eq"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<dialog id="detalhe" class="adm-modal" aria-labelledby="det-titulo"></dialog>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/reservas.js"></script>
+<script>
+  const HOJE = dataISO(new Date());
+  $("#nome-emp").textContent = EMPRESA.nome;
+  Reservas.semearDemo();
+  $("#f-st").insertAdjacentHTML("beforeend", Object.entries(STATUS).map(([k, v]) => `<option value="${k}">${v.rotulo}</option>`).join(""));
+  const selo = st => `<span class="st" style="--c:${STATUS[st].cor}">${STATUS[st].rotulo}</span>`;
+  const ativa = r => r.status !== "cancelada";
+  const cobre = (r, dia) => r.retirada <= dia && dia <= r.devolucao;
+  const resumoItens = r => r.itens.map(i => `${i.qtd > 1 ? i.qtd + "× " : ""}${nomeItem(i)}`).join(", ");
+
+  /* ---------- KPIs ---------- */
+  function kpis() {
+    const l = Reservas.listar().filter(ativa), mes = HOJE.slice(0, 7);
+    $("#k-ret").textContent = l.filter(r => r.retirada === HOJE).length;
+    $("#k-dev").textContent = l.filter(r => r.devolucao === HOJE).length;
+    $("#k-pen").textContent = l.filter(r => r.status === "pendente").length;
+    $("#k-fora").textContent = l.filter(r => r.status === "retirada").reduce((s, r) => s + r.itens.reduce((a, i) => a + i.qtd, 0), 0);
+    $("#k-rec").textContent = brl(l.filter(r => r.retirada.slice(0, 7) === mes).reduce((s, r) => s + r.total, 0));
+  }
+
+  /* ---------- LISTA ---------- */
+  const norm = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  function lista() {
+    const q = norm($("#f-q").value.trim()), st = $("#f-st").value, de = $("#f-de").value, ate = $("#f-ate").value;
+    let l = Reservas.listar().filter(r => (!st || r.status === st) &&
+      (!de || r.devolucao >= de) && (!ate || r.retirada <= ate) &&
+      (!q || norm(`${r.codigo} ${r.cliente.nome} ${r.cliente.telefone} ${r.cliente.producao} ${resumoItens(r)}`).includes(q)));
+    l.sort((a, b) => a.retirada.localeCompare(b.retirada) || a.codigo.localeCompare(b.codigo));
+    $("#res-lista").textContent = `${l.length} reserva${l.length === 1 ? "" : "s"}`;
+    $("#tb").innerHTML = l.length ? l.map(r => `<tr class="${r.retirada === HOJE || r.devolucao === HOJE ? "hoje" : ""}">
+      <td><b>${esc(r.codigo)}</b></td>
+      <td>${esc(r.cliente.nome)}<small>${esc(r.cliente.telefone)}${r.cliente.producao ? " · " + esc(r.cliente.producao) : ""}</small></td>
+      <td>${dataBR(r.retirada)}${r.retirada === HOJE ? ' <em class="tag-hoje">hoje</em>' : ""}</td>
+      <td>${dataBR(r.devolucao)}${r.devolucao === HOJE ? ' <em class="tag-hoje">hoje</em>' : ""}</td>
+      <td class="itens-cel">${esc(resumoItens(r))}</td>
+      <td>${brl(r.total)}</td><td>${selo(r.status)}</td>
+      <td><button class="btn btn-linha btn-p" data-ver="${r.id}">Abrir</button></td></tr>`).join("")
+      : `<tr><td colspan="8" class="vazio">Nenhuma reserva com esses filtros.</td></tr>`;
+    $$("[data-ver]").forEach(b => b.onclick = () => abrir(b.dataset.ver));
+  }
+  ["#f-q", "#f-st", "#f-de", "#f-ate"].forEach(s => $(s).addEventListener("input", lista));
+  $("#limpar").onclick = () => { ["#f-q", "#f-st", "#f-de", "#f-ate"].forEach(s => $(s).value = ""); lista(); };
+
+  /* ---------- DETALHE ---------- */
+  function abrir(id) {
+    const r = Reservas.listar().find(x => x.id === id); if (!r) return;
+    const tel = r.cliente.telefone.replace(/\D/g, ""), dias = diasEntre(r.retirada, r.devolucao);
+    const d = $("#detalhe");
+    d.innerHTML = `<form method="dialog" class="modal-fechar"><button aria-label="Fechar">✕</button></form>
+      <span class="card-cat">Pedido ${esc(r.codigo)} · criado em ${new Date(r.criadoEm).toLocaleDateString("pt-BR")}</span>
+      <h2 id="det-titulo">${esc(r.cliente.nome)}</h2>
+      <p class="det-sub">${esc(r.cliente.telefone)}${r.cliente.producao ? " · " + esc(r.cliente.producao) : ""}</p>
+      <div class="det-grid">
+        <div><small>Retirada</small><b>${dataBR(r.retirada)}</b></div>
+        <div><small>Devolução</small><b>${dataBR(r.devolucao)}</b></div>
+        <div><small>Diárias</small><b>${dias}</b></div>
+        <div><small>Total estimado</small><b>${brl(r.total)}</b></div>
+      </div>
+      <h3>Equipamentos</h3>
+      <ul class="det-itens">${r.itens.map(i => `<li><span>${i.qtd}× ${esc(nomeItem(i))}</span><span>${brl(((i.tipo === "kit" ? KITS : PRODUTOS).find(x => x.id === i.id)?.preco || 0))}/diária</span></li>`).join("")}</ul>
+      ${r.cupom ? `<p class="det-sub">Cupom aplicado: <b>${esc(r.cupom)}</b></p>` : ""}
+      ${r.obs ? `<p class="det-obs"><b>Obs.:</b> ${esc(r.obs)}</p>` : ""}
+      <label for="det-st">Status</label>
+      <select id="det-st">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === r.status ? "selected" : ""}>${v.rotulo}</option>`).join("")}</select>
+      <label for="det-nota">Anotação interna</label>
+      <textarea id="det-nota" rows="2" placeholder="Ex.: caução recebida, entrega às 7h…">${esc(r.nota || "")}</textarea>
+      <div class="det-acoes">
+        <button class="btn btn-primario" id="det-salvar">Salvar</button>
+        ${tel.length >= 10 ? `<a class="btn btn-wa" target="_blank" rel="noopener" href="https://wa.me/55${tel}?text=${encodeURIComponent(`Olá, ${r.cliente.nome}! Sobre o seu pedido ${r.codigo} na ${EMPRESA.nome}:`)}">WhatsApp do cliente</a>` : ""}
+        <button class="btn btn-linha" id="det-excluir" style="color:#b03a22">Excluir</button>
+      </div>`;
+    d.showModal();
+    $("#det-salvar").onclick = () => { Reservas.atualizar(r.id, { status: $("#det-st").value, nota: $("#det-nota").value.trim() }); d.close(); tudo(); avisar("Reserva atualizada"); };
+    $("#det-excluir").onclick = () => { if (confirm(`Excluir o pedido ${r.codigo}? Isso não pode ser desfeito.`)) { Reservas.remover(r.id); d.close(); tudo(); avisar("Reserva excluída"); } };
+  }
+  $("#detalhe").addEventListener("click", e => { if (e.target.id === "detalhe") e.target.close(); });
+
+  /* ---------- CALENDARIO ---------- */
+  let mesCal = new Date(); mesCal.setDate(1);
+  function calendario() {
+    const ano = mesCal.getFullYear(), mes = mesCal.getMonth();
+    { const t = mesCal.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }); $("#cal-titulo").textContent = t.charAt(0).toUpperCase() + t.slice(1); }
+    const ini = new Date(ano, mes, 1), offset = ini.getDay(), nd = new Date(ano, mes + 1, 0).getDate();
+    const l = Reservas.listar().filter(ativa);
+    let html = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map(d => `<div class="cal-cab">${d}</div>`).join("");
+    for (let i = 0; i < offset; i++) html += `<div class="cal-dia vazio-dia"></div>`;
+    for (let dd = 1; dd <= nd; dd++) {
+      const dia = dataISO(new Date(ano, mes, dd));
+      const doDia = l.filter(r => cobre(r, dia));
+      const chips = doDia.slice(0, 4).map(r => {
+        const tipo = r.retirada === dia ? "ret" : r.devolucao === dia ? "dev" : "uso";
+        return `<button class="chip ${tipo}" data-ver="${r.id}" title="${esc(r.cliente.nome)} — ${esc(resumoItens(r))}">${tipo === "ret" ? "↑" : tipo === "dev" ? "↓" : "•"} ${esc(r.codigo)} ${esc(r.cliente.nome.split(" ")[0])}</button>`;
+      }).join("") + (doDia.length > 4 ? `<span class="mais">+${doDia.length - 4}</span>` : "");
+      html += `<div class="cal-dia ${dia === HOJE ? "hoje" : ""}"><button class="cal-num" data-dia="${dia}" aria-label="Ver reservas de ${dataBR(dia)}">${dd}</button>${chips}</div>`;
+    }
+    $("#cal").innerHTML = html;
+    $$("#cal [data-ver]").forEach(b => b.onclick = () => abrir(b.dataset.ver));
+    $$("#cal [data-dia]").forEach(b => b.onclick = () => { $("#f-de").value = b.dataset.dia; $("#f-ate").value = b.dataset.dia; trocarAba("lista"); lista(); });
+  }
+  $("#cal-ant").onclick = () => { mesCal.setMonth(mesCal.getMonth() - 1); calendario(); };
+  $("#cal-prox").onclick = () => { mesCal.setMonth(mesCal.getMonth() + 1); calendario(); };
+
+  /* ---------- EQUIPAMENTOS ---------- */
+  function equipamentos() {
+    const l = Reservas.listar().filter(ativa);
+    const usos = id => l.filter(r => r.itens.some(i => i.id === id));   // kits ainda nao detalham itens por id
+    $("#tb-eq").innerHTML = PRODUTOS.map(p => {
+      const u = usos(p.id).sort((a, b) => a.retirada.localeCompare(b.retirada));
+      const agora = u.find(r => r.status === "retirada");
+      const futuras = u.filter(r => r.devolucao >= HOJE && r.status !== "devolvida");
+      const conflito = futuras.some((a, i) => futuras.some((b, j) => j > i && a.retirada <= b.devolucao && b.retirada <= a.devolucao));
+      return `<tr class="${conflito ? "conflito" : ""}"><td><b>${esc(p.nome)}</b></td><td>${catNome(p.cat)}</td>
+        <td>${agora ? `<span class="st" style="--c:${STATUS.retirada.cor}">Fora · ${esc(agora.codigo)} até ${dataBR(agora.devolucao)}</span>` : '<span class="st" style="--c:#15803d">Disponível</span>'}</td>
+        <td>${futuras.length ? futuras.slice(0, 3).map(r => `<button class="chip uso" data-ver="${r.id}">${dataBR(r.retirada).slice(0, 5)}–${dataBR(r.devolucao).slice(0, 5)} · ${esc(r.codigo)}</button>`).join(" ") : "—"}</td>
+        <td>${conflito ? "⚠️ Datas sobrepostas" : ""}</td></tr>`;
+    }).join("");
+    $$("#tb-eq [data-ver]").forEach(b => b.onclick = () => abrir(b.dataset.ver));
+  }
+
+  /* ---------- abas / exportar ---------- */
+  function trocarAba(a) {
+    $$(".adm-abas .aba").forEach(b => b.setAttribute("aria-selected", b.dataset.aba === a));
+    ["lista", "cal", "equip"].forEach(x => $("#aba-" + x).hidden = x !== a);
+  }
+  $$(".adm-abas .aba").forEach(b => b.onclick = () => trocarAba(b.dataset.aba));
+  $("#exportar").onclick = () => {
+    const linhas = [["Código", "Status", "Cliente", "Telefone", "Produção", "Retirada", "Devolução", "Itens", "Total", "Cupom", "Obs", "Anotação"]];
+    Reservas.listar().forEach(r => linhas.push([r.codigo, STATUS[r.status].rotulo, r.cliente.nome, r.cliente.telefone, r.cliente.producao, dataBR(r.retirada), dataBR(r.devolucao), resumoItens(r), r.total.toFixed(2).replace(".", ","), r.cupom, r.obs, r.nota || ""]));
+    const csv = "﻿" + linhas.map(l => l.map(c => `"${String(c ?? "").replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = `reservas_${HOJE}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  };
+  $("#restaurar").onclick = () => { if (confirm("Substituir as reservas deste navegador pelos exemplos?")) { Reservas.semearDemo(true); tudo(); } };
+  function tudo() { kpis(); lista(); calendario(); equipamentos(); }
+  tudo();
+  if (["#cal", "#equip"].includes(location.hash)) trocarAba(location.hash.slice(1));
+</script>
+</body>
+</html>

@@ -89,7 +89,7 @@ function rodape() {
       <p>Texto curto sobre a empresa: locação de equipamentos audiovisuais com atendimento de quem vive set.</p>
       <p class="sociais"><a href="${EMPRESA.instagram}" aria-label="Instagram">Instagram</a> · <a href="${waLink("Olá!")}" target="_blank" rel="noopener">WhatsApp</a></p></div>
     <div><h4>Equipamentos</h4>${CATEGORIAS.map(c => `<a href="catalogo.html?cat=${c.id}">${c.nome}</a>`).join("")}</div>
-    <div><h4>Institucional</h4><a href="index.html#como-alugar">Como alugar</a><a href="index.html#sobre">Quem somos</a><a href="index.html#kits">Kits</a><a href="catalogo.html">Catálogo completo</a><a href="index.html#faq">Perguntas frequentes</a></div>
+    <div><h4>Institucional</h4><a href="index.html#como-alugar">Como alugar</a><a href="index.html#sobre">Quem somos</a><a href="index.html#kits">Kits</a><a href="catalogo.html">Catálogo completo</a><a href="index.html#faq">Perguntas frequentes</a><a href="admin.html">Área do funcionário</a></div>
     <div><h4>Atendimento</h4><a href="${waLink("Olá! Quero falar com o comercial.")}" target="_blank" rel="noopener">Comercial: ${EMPRESA.telefoneExibicao}</a><a href="mailto:${EMPRESA.email}">${EMPRESA.email}</a>
       <p>Seg a sex, 8h às 18h · Sáb, 9h às 13h<br>${EMPRESA.endereco}</p></div>
   </div><div class="wrap legal">${EMPRESA.nome} · CNPJ ${EMPRESA.cnpj} · © ${new Date().getFullYear()} · Protótipo — dados fictícios</div></footer>
